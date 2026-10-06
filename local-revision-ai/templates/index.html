@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Local Revision Helper</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: #121212; color: #e0e0e0; padding: 24px; max-width: 850px; margin: 0 auto; }
+        h1 { margin-bottom: 6px; color: #8ab4f8; }
+        p.sub { margin-bottom: 20px; color: #aaa; font-size: 14px; }
+        
+        /* Topic Bar Styling */
+        .topic-box { display: flex; gap: 10px; margin-bottom: 16px; background: #1e1f20; padding: 12px; border-radius: 12px; border: 1px solid #333; }
+        .topic-box input { flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid #444; background: #121212; color: white; font-size: 14px; outline: none; }
+        .topic-box input:focus { border-color: #8ab4f8; }
+        .gen-btn { padding: 12px 20px; border-radius: 8px; border: none; background: #c2e7ff; color: #001d35; font-weight: bold; cursor: pointer; font-size: 14px; }
+        .gen-btn:hover { background: #7fcfff; }
+
+        textarea { width: 100%; height: 180px; padding: 16px; border-radius: 12px; background: #1e1f20; color: white; border: 1px solid #333; font-size: 15px; outline: none; margin-bottom: 16px; }
+        .controls { display: flex; gap: 12px; margin-bottom: 24px; }
+        button.action-btn { flex: 1; padding: 14px; border-radius: 8px; border: none; background: #8ab4f8; color: #121212; font-weight: bold; cursor: pointer; font-size: 15px; }
+        button.action-btn:hover { background: #a8c7fa; }
+        
+        #output-container { padding: 24px; background: #1e1f20; border-radius: 12px; border: 1px solid #333; min-height: 140px; }
+        .text-result { white-space: pre-wrap; line-height: 1.6; }
+        
+        /* Quiz Card Styles */
+        .quiz-card { background: #262729; border: 1px solid #3c4043; border-radius: 10px; padding: 20px; }
+        .quiz-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 14px; color: #8ab4f8; font-weight: bold; }
+        .quiz-question { font-weight: 600; font-size: 17px; margin-bottom: 16px; color: #ffffff; line-height: 1.4; }
+        
+        .options-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+        .checkbox-option { display: flex; align-items: center; gap: 12px; background: #1e1f20; border: 1px solid #444; padding: 14px 16px; border-radius: 8px; cursor: pointer; font-size: 15px; transition: all 0.2s; }
+        .checkbox-option:hover { background: #2e3033; border-color: #8ab4f8; }
+        .checkbox-option input[type="checkbox"] { width: 18px; height: 18px; accent-color: #8ab4f8; cursor: pointer; }
+        
+        /* Feedback Styling */
+        .checkbox-option.correct { background: #137333 !important; border-color: #34a853 !important; color: white; font-weight: bold; }
+        .checkbox-option.incorrect { background: #a50e0e !important; border-color: #ea4335 !important; color: white; }
+        
+        .explanation { margin-top: 14px; padding: 14px; background: #1b2735; border-left: 4px solid #8ab4f8; border-radius: 6px; font-size: 14px; color: #d0e1fd; display: none; line-height: 1.5; }
+        
+        .next-btn { display: none; margin-top: 16px; padding: 12px 24px; background: #8ab4f8; color: #121212; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; float: right; font-size: 15px; }
+        .next-btn:hover { background: #a8c7fa; }
+        
+        .score-card { text-align: center; padding: 20px; }
+        .score-card h2 { color: #8ab4f8; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>📚 Local Revision Helper</h1>
+    <p class="sub">Offline Learning Assistant (Powered by Llama 3.2 1B)</p>
+
+    <!-- New Topic Generation Box -->
+    <div class="topic-box">
+        <input type="text" id="topicInput" placeholder="Enter any topic name (e.g. CPU Scheduling, Binary Trees, Photosynthesis)...">
+        <button class="gen-btn" onclick="generateNotesFromTopic()">⚡ Generate Notes</button>
+    </div>
+
+    <textarea id="notes" placeholder="Generated or pasted notes will appear here..."></textarea>
+
+    <div class="controls">
+        <button class="action-btn" onclick="runTask('summary')">📝 Generate Summary</button>
+        <button class="action-btn" onclick="runTask('quiz')">❓ Interactive Step Quiz</button>
+        <button class="action-btn" onclick="runTask('explain')">💡 Explain Simply</button>
+    </div>
+
+    <div id="output-container">Your output will appear here...</div>
+
+    <script>
+        let currentQuizData = [];
+        let currentQuestionIndex = 0;
+        let userScore = 0;
+
+        async function generateNotesFromTopic() {
+            const topic = document.getElementById('topicInput').value.trim();
+            const textarea = document.getElementById('notes');
+            const container = document.getElementById('output-container');
+
+            if (!topic) { alert('Please enter a topic name first!'); return; }
+
+            textarea.value = `Generating study notes for "${topic}" locally...`;
+            container.innerHTML = "Generating notes...";
+
+            try {
+                const res = await fetch('/process', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ notes: topic, task: 'generate_note' })
+                });
+                const data = await res.json();
+                
+                if (data.result) {
+                    textarea.value = data.result;
+                    container.innerHTML = `✅ Notes generated for <b>"${topic}"</b>! You can now generate a summary, interactive quiz, or simplified explanation.`;
+                } else {
+                    textarea.value = data.error || "Failed to generate notes.";
+                }
+            } catch(e) {
+                textarea.value = "Error connecting to local AI server.";
+            }
+        }
+
+        async function runTask(task) {
+            const notes = document.getElementById('notes').value.trim();
+            const container = document.getElementById('output-container');
+            if (!notes) { alert('Please enter or generate study notes first!'); return; }
+
+            // Support raw JSON pasting fallback
+            if (task === "quiz" && (notes.startsWith("{") || notes.startsWith("["))) {
+                try {
+                    let jsonText = notes;
+                    if (!notes.startsWith("[")) {
+                        jsonText = "[" + notes.replace(/}\s*{/g, "},{") + "]";
+                    }
+                    currentQuizData = JSON.parse(jsonText);
+                    startStepQuiz();
+                    return;
+                } catch(e) {
+                    console.log("JSON parse fallback engaged...");
+                }
+            }
+
+            container.innerHTML = "Processing locally on CPU...";
+
+            try {
+                const res = await fetch('/process', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ notes: notes, task: task })
+                });
+                const responseData = await res.json();
+
+                if (responseData.error) {
+                    container.innerHTML = `<div class="text-result">${responseData.error}</div>`;
+                    return;
+                }
+
+                if (responseData.task === "quiz" && Array.isArray(responseData.data)) {
+                    currentQuizData = responseData.data;
+                    startStepQuiz();
+                } else {
+                    container.innerHTML = `<div class="text-result">${responseData.result}</div>`;
+                }
+            } catch (e) {
+                container.innerHTML = "Error connecting to local server.";
+            }
+        }
+
+        function startStepQuiz() {
+            currentQuestionIndex = 0;
+            userScore = 0;
+            renderSingleQuestion();
+        }
+
+        function renderSingleQuestion() {
+            const container = document.getElementById('output-container');
+            
+            if (currentQuestionIndex >= currentQuizData.length) {
+                container.innerHTML = `
+                    <div class="score-card">
+                        <h2>🎉 Quiz Completed!</h2>
+                        <p style="font-size: 18px;">Your Score: <b>${userScore} / ${currentQuizData.length}</b></p>
+                    </div>
+                `;
+                return;
+            }
+
+            const q = currentQuizData[currentQuestionIndex];
+
+            let optionsHTML = "";
+            q.options.forEach((opt, oIndex) => {
+                optionsHTML += `
+                    <label class="checkbox-option" id="label-${oIndex}">
+                        <input type="checkbox" id="check-${oIndex}" onchange="checkAnswerStep(${oIndex}, ${q.answerIndex})">
+                        <span>${opt}</span>
+                    </label>
+                `;
+            });
+
+            container.innerHTML = `
+                <div class="quiz-card">
+                    <div class="quiz-header">
+                        <span>Question ${currentQuestionIndex + 1} of ${currentQuizData.length}</span>
+                        <span>Score: ${userScore}</span>
+                    </div>
+                    <div class="quiz-question">${q.question}</div>
+                    <div class="options-list">${optionsHTML}</div>
+                    <div class="explanation" id="exp-box">💡 <b>Explanation:</b> ${q.explanation || 'Review your notes for more context.'}</div>
+                    <button class="next-btn" id="next-btn" onclick="nextQuestion()">Next Question ➔</button>
+                    <div style="clear: both;"></div>
+                </div>
+            `;
+        }
+
+        function checkAnswerStep(selectedIndex, correctIndex) {
+            const selectedLabel = document.getElementById(`label-${selectedIndex}`);
+            const correctLabel = document.getElementById(`label-${correctIndex}`);
+            const expBox = document.getElementById('exp-box');
+            const nextBtn = document.getElementById('next-btn');
+
+            const allCheckboxes = document.querySelectorAll('[id^="check-"]');
+            allCheckboxes.forEach(cb => cb.disabled = true);
+
+            if (selectedIndex === correctIndex) {
+                selectedLabel.classList.add("correct");
+                userScore++;
+            } else {
+                selectedLabel.classList.add("incorrect");
+                if (correctLabel) {
+                    correctLabel.classList.add("correct");
+                }
+            }
+
+            expBox.style.display = "block";
+            nextBtn.style.display = "inline-block";
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            renderSingleQuestion();
+        }
+    </script>
+</body>
+</html>
